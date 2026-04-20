@@ -148,16 +148,191 @@ Relevant configuration:
 
 If you are running the project for the first time:
 
-1. Install Java, Maven, Node.js, and npm.
-2. Run `npm install` inside `frontend/`.
-3. Run `mvn spring-boot:run` inside `backend/`.
-4. Run `npm run dev` inside `frontend/`.
+1. Install Java `17`.
+2. Install Maven `3.9+`.
+3. Install Node.js `18+`, which also gives you npm.
+4. Open a fresh terminal after installation so the new commands are available in your PATH.
+5. Verify the tools are installed correctly.
+6. Install frontend dependencies.
+7. Start the backend.
+8. Start the frontend.
 
-Notes:
+### 6.1 Install Java 17
 
-- Maven downloads backend dependencies automatically.
-- npm downloads frontend dependencies automatically.
-- The frontend build output is static, but the backend must stay running because all encryption, decryption, image processing, and secure chat APIs are server-side.
+You need Java `17` because the Spring Boot backend is built to run on that version.
+
+Windows options:
+
+- install Eclipse Temurin 17
+- install Oracle JDK 17
+- install Microsoft Build of OpenJDK 17
+
+After installation, open a new terminal and run:
+
+```bash
+java -version
+```
+
+Expected result:
+
+- the command should work without an error
+- the version should show Java `17`
+
+If `java` is not recognized:
+
+- reopen the terminal
+- restart your computer if needed
+- confirm that Java was added to your system PATH
+
+### 6.2 Install Maven
+
+Maven is required to build and run the backend.
+
+Windows installation methods:
+
+- install Maven manually from the Apache Maven website and add its `bin` folder to PATH
+- or use a package manager such as Chocolatey or Winget if you already use one
+
+After installation, open a new terminal and run:
+
+```bash
+mvn -version
+```
+
+Expected result:
+
+- Maven version information is displayed
+- Java home is detected correctly
+- the command runs without errors
+
+If `mvn` is not recognized:
+
+- verify Maven is installed
+- verify Maven's `bin` folder is in PATH
+- make sure Java is installed first because Maven depends on Java
+
+### 6.3 Install Node.js and npm
+
+The frontend requires Node.js and npm.
+
+Recommended approach:
+
+- install the LTS version of Node.js `18+`
+
+After installation, run:
+
+```bash
+node -v
+npm -v
+```
+
+Expected result:
+
+- `node -v` shows version `18` or newer
+- `npm -v` shows a valid npm version
+
+If the commands fail:
+
+- reopen the terminal
+- check whether Node.js was added to PATH
+- reinstall Node.js if needed
+
+### 6.4 Verify the Project Folder
+
+Before installing dependencies, make sure you are in the project root:
+
+```bash
+cd path/to/StegaCryptWeb_FIXED
+```
+
+You should be able to see folders such as:
+
+- `backend`
+- `frontend`
+- `docs`
+
+### 6.5 Install Frontend Dependencies
+
+Move to the frontend folder and install the required packages:
+
+```bash
+cd frontend
+npm install
+```
+
+What happens here:
+
+- npm reads `package.json`
+- npm downloads the frontend packages into `frontend/node_modules`
+- npm creates or updates the lockfile if needed
+
+If installation fails:
+
+- check your internet connection
+- check whether npm is installed correctly
+- try running the command again after deleting a broken partial install only if needed
+
+### 6.6 Start the Backend for the First Time
+
+Open a terminal in the project root and run:
+
+```bash
+cd backend
+mvn spring-boot:run
+```
+
+What happens here:
+
+- Maven downloads backend dependencies the first time
+- Spring Boot compiles and starts the API server
+- the backend becomes available on port `8080`
+
+Wait until the console shows that the application has started, then check:
+
+```text
+http://localhost:8080/api/health
+```
+
+If the backend does not start:
+
+- check Java version
+- check Maven installation
+- check whether port `8080` is already in use
+
+### 6.7 Start the Frontend for the First Time
+
+Open a second terminal in the project root and run:
+
+```bash
+cd frontend
+npm run dev
+```
+
+What happens here:
+
+- Vite starts the development server
+- the frontend becomes available on port `3000`
+- the frontend begins sending API requests to the backend
+
+Then open:
+
+```text
+http://localhost:3000
+```
+
+If the frontend does not start:
+
+- check whether `npm install` completed successfully
+- check whether port `3000` is free
+- confirm that Node.js and npm are available in the terminal
+
+### 6.8 Important First-Run Notes
+
+- Maven may take a few minutes on the first run because it downloads backend dependencies.
+- npm may take a few minutes on the first run because it downloads frontend dependencies.
+- The backend must stay running because encryption, decryption, steganography, authentication, and secure chat logic all run server-side.
+- The frontend depends on the backend, so opening the UI without the backend running will cause API errors.
+- If you prefer a simpler startup workflow, use `run-project.bat` on Windows or `run-project.sh` on Bash-compatible terminals.
 
 ## 7. User Manual
 
