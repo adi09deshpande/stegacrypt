@@ -22,6 +22,8 @@ import java.awt.image.BufferedImage;
 import java.nio.charset.StandardCharsets;
 import java.security.PublicKey;
 import java.security.PrivateKey;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -92,7 +94,7 @@ public class AuthChatController {
     @PostMapping("/chat/send")
     public ResponseEntity<?> sendChatShare(
         @RequestHeader("X-Auth-Token") String token,
-        @RequestParam("recipientUsername") String recipientUsername,
+        @RequestParam("recipientUsernames") List<String> recipientUsernames,
         @RequestParam("message") String message,
         @RequestParam(value = "useCompression", defaultValue = "true") boolean useCompression,
         @RequestParam("image") MultipartFile image
@@ -100,24 +102,29 @@ public class AuthChatController {
         try {
             AuthChatService.UserAccount sender = authChatService.requireUser(token);
             ValidationUtil.validateMessage(message);
+            List<String> normalizedRecipients = authChatService.normalizeRecipientUsernames(recipientUsernames);
+            byte[] carrierImageBytes = image.getBytes();
+            List<AuthChatService.PreparedShare> preparedShares = new ArrayList<>();
 
-            PublicKey recipientPublicKey = authChatService.getRecipientPublicKey(recipientUsername);
-            String seedMaterial = RSAUtil.getKeyFingerprint(recipientPublicKey);
-            BufferedImage carrierImage = imageProcessingService.loadImage(image);
-            String securePayload = buildChatPayload(sender.username(), recipientUsername, message);
+            for (String recipientUsername : normalizedRecipients) {
+                PublicKey recipientPublicKey = authChatService.getRecipientPublicKey(recipientUsername);
+                String seedMaterial = RSAUtil.getKeyFingerprint(recipientPublicKey);
+                BufferedImage carrierImage = imageProcessingService.loadImageFromBytes(carrierImageBytes);
+                String securePayload = buildChatPayload(sender.username(), recipientUsername, message);
 
-            boolean compressed = useCompression && compressionService.shouldCompress(securePayload);
-            byte[] dataToEncrypt = compressed
-                ? compressionService.compress(securePayload)
-                : securePayload.getBytes(StandardCharsets.UTF_8);
+                boolean compressed = useCompression && compressionService.shouldCompress(securePayload);
+                byte[] dataToEncrypt = compressed
+                    ? compressionService.compress(securePayload)
+                    : securePayload.getBytes(StandardCharsets.UTF_8);
 
-            byte[] encryptedPayload = AESUtil.encrypt(dataToEncrypt, recipientPublicKey, compressed);
-            steganographyService.embedData(carrierImage, encryptedPayload, seedMaterial);
-            byte[] stegoImageBytes = imageProcessingService.saveImageAsPNG(carrierImage);
+                byte[] encryptedPayload = AESUtil.encrypt(dataToEncrypt, recipientPublicKey, compressed);
+                steganographyService.embedData(carrierImage, encryptedPayload, seedMaterial);
+                byte[] stegoImageBytes = imageProcessingService.saveImageAsPNG(carrierImage);
 
-            return ResponseEntity.ok(
-                authChatService.sendShare(token, recipientUsername, message, compressed, stegoImageBytes)
-            );
+                preparedShares.add(new AuthChatService.PreparedShare(recipientUsername, compressed, stegoImageBytes));
+            }
+
+            return ResponseEntity.ok(authChatService.sendShares(token, message, preparedShares));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error(e.getMessage()));
         }

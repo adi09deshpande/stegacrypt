@@ -13,9 +13,11 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
@@ -135,6 +137,57 @@ public class AuthChatService {
         return response;
     }
 
+    public Map<String, Object> sendShares(String token, String message, List<PreparedShare> preparedShares) {
+        UserAccount sender = requireUser(token);
+        if (message == null || message.isBlank()) {
+            throw new IllegalArgumentException("Message is required.");
+        }
+        if (preparedShares == null || preparedShares.isEmpty()) {
+            throw new IllegalArgumentException("Choose at least one recipient.");
+        }
+
+        List<Map<String, Object>> shares = new ArrayList<>();
+        for (PreparedShare preparedShare : preparedShares) {
+            UserAccount recipient = usersByUsername.get(normalizeUsername(preparedShare.recipientUsername()));
+
+            if (recipient == null) {
+                throw new IllegalArgumentException("Recipient account was not found.");
+            }
+            if (recipient.username().equals(sender.username())) {
+                throw new IllegalArgumentException("Choose another member to receive the secure share.");
+            }
+            if (preparedShare.stegoImageBytes() == null || preparedShare.stegoImageBytes().length == 0) {
+                throw new IllegalArgumentException("Stego image data is missing.");
+            }
+
+            long shareId = shareIdSequence.getAndIncrement();
+            ChatShare share = new ChatShare(
+                shareId,
+                sender.username(),
+                sender.fullName(),
+                recipient.username(),
+                recipient.fullName(),
+                message.trim(),
+                preparedShare.useCompression(),
+                Base64.getEncoder().encodeToString(preparedShare.stegoImageBytes()),
+                Instant.now().toString(),
+                false,
+                null,
+                null
+            );
+
+            sharesById.put(shareId, share);
+            shares.add(buildSharePayload(share, sender.username()));
+        }
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("success", true);
+        response.put("message", "Secure shares sent successfully.");
+        response.put("shares", shares);
+        response.put("timestamp", System.currentTimeMillis());
+        return response;
+    }
+
     public Map<String, Object> decryptShare(
         String token,
         long shareId,
@@ -193,6 +246,26 @@ public class AuthChatService {
             throw new IllegalArgumentException("Recipient account was not found.");
         }
         return user.publicKey();
+    }
+
+    public List<String> normalizeRecipientUsernames(List<String> recipientUsernames) {
+        if (recipientUsernames == null || recipientUsernames.isEmpty()) {
+            throw new IllegalArgumentException("Choose at least one recipient.");
+        }
+
+        Set<String> normalizedRecipients = new LinkedHashSet<>();
+        for (String recipientUsername : recipientUsernames) {
+            String normalized = normalizeUsername(recipientUsername);
+            if (!normalized.isBlank()) {
+                normalizedRecipients.add(normalized);
+            }
+        }
+
+        if (normalizedRecipients.isEmpty()) {
+            throw new IllegalArgumentException("Choose at least one recipient.");
+        }
+
+        return List.copyOf(normalizedRecipients);
     }
 
     public UserAccount getUserByUsername(String username) {
@@ -332,6 +405,12 @@ public class AuthChatService {
         boolean seeded,
         PublicKey publicKey,
         PrivateKey privateKey
+    ) {}
+
+    public record PreparedShare(
+        String recipientUsername,
+        boolean useCompression,
+        byte[] stegoImageBytes
     ) {}
 
     private record ChatShare(
